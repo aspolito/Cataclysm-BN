@@ -96,8 +96,14 @@ bool character_martial_arts::pick_style( const avatar &you )  // Style selection
                 bio_cqb ) ? bio_cqb_styles :
             ma_styles;
 
+    itype_id &wielded = "fist";  //XXX : PROBABLY NOT... what is the answer?
+    if ( you.wielded_items().size() ) {
+        itype_id = you.wielded_items().front().typeId();
+    }
+
     input_context ctxt( "MELEE_STYLE_PICKER" );
     ctxt.register_action( "SHOW_DESCRIPTION" );
+    ctxt.register_action( "SET_DEFAULT" );
 
     uilist kmenu;
     kmenu.text = string_format( _( "Select a style.\n"
@@ -106,14 +112,17 @@ bool character_martial_arts::pick_style( const avatar &you )  // Style selection
                                    "PER: <color_white>%d</color>, INT: <color_white>%d</color>\n"
                                    "Base empty-handed damage: %3d\n"
                                    "Effective dodge rating: %4.1f\n"
+                                   "Press [<color_yellow>%s</color>] to make default for this weapon.\n"
                                    "Press [<color_yellow>%s</color>] for more info.\n" ),
                                 you.get_str(), you.get_dex(), you.get_per(), you.get_int(),
                                 character_display::display_empty_handed_base_damage( you ), you.get_dodge(),
+                                ctxt.get_desc( "SET_DEFAULT" ),
                                 ctxt.get_desc( "SHOW_DESCRIPTION" ) );
     ma_style_callback callback( static_cast<size_t>( STYLE_OFFSET ), selectable_styles );
     kmenu.callback = &callback;
     kmenu.input_category = "MELEE_STYLE_PICKER";
     kmenu.additional_actions.emplace_back( "SHOW_DESCRIPTION", translation() );
+    kmenu.additional_actions.emplace_back( "SET_DEFAULT", translation() );
     kmenu.desc_enabled = true;
     kmenu.addentry_desc( KEEP_HANDS_FREE, true, 'h',
                          keep_hands_free ? _( "Keep hands free (on)" ) : _( "Keep hands free (off)" ),
@@ -125,10 +134,14 @@ bool character_martial_arts::pick_style( const avatar &you )  // Style selection
         auto &style = selectable_styles[i].obj();
         //Check if this style is currently selected
         const bool selected = selectable_styles[i] == style_selected;
+        const bool is_default = ma_default_styles.contains( wielded ) && 
+                                ( ma_default_styles.find( wielded ) == selectable_styles[i] );
         std::string entry_text = style.name.translated();
         if( selected ) {
             kmenu.selected = i + STYLE_OFFSET;
-            entry_text = colorize( entry_text, c_pink );
+            entry_text = colorize( entry_text, is_default ? c_red : c_pink );
+        } else if ( is_default ) {
+            entry_text = colorize( c_green );
         }
         kmenu.addentry_desc( i + STYLE_OFFSET, true, -1, entry_text, style.description.translated() );
     }
